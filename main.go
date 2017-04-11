@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -47,6 +46,15 @@ func query(accountID, queryKey, nrql string) ([]row, error) {
 	data, err := ioutil.ReadAll(rsp.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	// Check the status code
+	if rsp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf(
+			"Wanted HTTP 200; got %d: %s",
+			rsp.StatusCode,
+			data,
+		)
 	}
 
 	// Allocate a thing that looks vaguely like the payload. The JSON library
@@ -156,7 +164,7 @@ func toCSV(w io.Writer, rows []row) error {
 
 func main() {
 	// Make sure we received a query string; if not, print an error and bail
-	if len(os.Args) < 2 {
+	if len(os.Args) < 2 || os.Args[1] == "--help" {
 		fmt.Fprintf(os.Stderr, "USAGE: %s <nrql>\n", os.Args[0])
 		os.Exit(-1)
 	}
@@ -179,11 +187,13 @@ func main() {
 	// Execute the query
 	rows, err := query(accountID, queryKey, os.Args[1])
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(-1)
 	}
 
 	// Format the query
 	if err := toCSV(os.Stdout, rows); err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(-1)
 	}
 }
