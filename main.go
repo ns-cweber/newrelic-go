@@ -47,7 +47,7 @@ func parseFlags() (query, []staticColumn) {
 	}
 
 	if q.table == "" {
-		fmt.Fprintln(os.Stderr, "No table argument specified")
+		fmt.Fprintln(os.Stderr, "Missing --from flag")
 		flag.Usage()
 		os.Exit(-1)
 	}
