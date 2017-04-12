@@ -3,20 +3,36 @@ README
 
 NOTE: This is alpha software
 
-Executes a NRQL query and returns the result in CSV form. The Insights API
-doesn't provide a good mechanism for preserving column order, so the returned
-columns are not likely to be in the order specified in the query. You will need
+Executes a NRQL query and returns the result in CSV form. You will need
 NEW_RELIC_ACCOUNT_ID and NEW_RELIC_QUERY_KEY environment variables (for
 information about how to get your query key, [see here][0]).
 
 ## USAGE
 
-`nrql2csv <nrql-query>`
+```bash
+Usage of nrql2csv:
+  -facet string
+    	[OPTIONAL] the FACET column
+  -from string
+    	[REQUIRED] the table to query from
+  -limit int
+    	[OPTIONAL] the LIMIT column (default -1)
+  -select string
+    	[OPTIONAL] the comma-delineated column names to query for
+  -since string
+    	[OPTIONAL] the SINCE clause
+  -static string
+    	[OPTIONAL] extra fixed-value columns (e.g., 'col1=val1,col2=val2')
+  -until string
+    	[OPTIONAL] the UNTIL clause
+  -where string
+    	[OPTIONAL] the WHERE clause
+```
 
 ## EXAMPLE
 
 ``` bash
-$ nrql2csv "SELECT name, duration FROM transaction LIMIT 8"
+$ nrql2csv --select name,timestamp,duration --from Transaction --limit 8"
 duration,timestamp,name
 0.001,1491944202715,WebTransaction/Expressjs/GET//s_health
 0.001,1491944202453,WebTransaction/Expressjs/GET//s_health
