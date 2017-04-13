@@ -101,16 +101,14 @@ func main() {
 	// Make sure we have the account ID
 	accountID := os.Getenv("NEW_RELIC_ACCOUNT_ID")
 	if accountID == "" {
-		fmt.Fprintln(os.Stderr, "Missing $NEW_RELIC_ACCOUNT_ID")
-		os.Exit(-1)
+		abort(os.Stderr, "Missing $NEW_RELIC_ACCOUNT_ID")
 	}
 
 	// Make sure we have the query key
 	// (https://docs.newrelic.com/docs/insights/export-insights-data/export-api/query-insights-event-data-api#register)
 	queryKey := os.Getenv("NEW_RELIC_QUERY_KEY")
 	if queryKey == "" {
-		fmt.Fprintln(os.Stderr, "Missing $NEW_RELIC_QUERY_KEY")
-		os.Exit(-1)
+		abort("Missing $NEW_RELIC_QUERY_KEY")
 	}
 
 	// Execute the query
