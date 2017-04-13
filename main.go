@@ -119,8 +119,11 @@ func main() {
 		abortf("Error for query '%s': %v", q, err)
 	}
 
+	// Add the static columns
+	payload = staticColumnsPayload{payload, staticColumns}
+
 	// Format the query
-	if err := toCSV(os.Stdout, staticColumns, payload); err != nil {
+	if err := toCSV(os.Stdout, payload); err != nil {
 		abort(err)
 	}
 }

@@ -11,6 +11,8 @@ information about how to get your query key, [see here][0]).
 
 ```bash
 Usage of nrql2csv:
+  -dry
+    	[OPTIONAL] Prints the query
   -facet string
     	[OPTIONAL] the FACET column
   -from string

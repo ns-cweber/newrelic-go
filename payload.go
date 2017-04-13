@@ -7,11 +7,42 @@ import (
 	"log"
 )
 
+// This is an abstraction over all of the varieties of payloads the New Relic
+// API might send down.
 type payload interface {
-	Columns() []string
-	Rows() [][]interface{}
+	columns() []string
+	rows() [][]interface{}
 }
 
+// This type wraps an existing payload and suffixes it with fixed data from
+// static columns. Given a table with columns {a, b, c} and static columns
+// {d, e} with values {4, 5} respectively, the resultant columns will be {a, b,
+// c, d, e} and the last two columns will be entirely 4s and 5s respectively.
+type staticColumnsPayload struct {
+	payload
+	staticColumns []staticColumn
+}
+
+func (p staticColumnsPayload) columns() []string {
+	columns := p.payload.columns()
+	staticColumnHeaders := make([]string, len(p.staticColumns))
+	for i, column := range p.staticColumns {
+		staticColumnHeaders[i] = column.name
+	}
+	return append(columns, staticColumnHeaders...)
+}
+
+func (p staticColumnsPayload) rows() [][]interface{} {
+	rows := p.payload.rows()
+	for _, column := range p.staticColumns {
+		for i, row := range rows {
+			rows[i] = append(row, column.value)
+		}
+	}
+	return rows
+}
+
+// This represents the basic (no-aggregations, no-facets) payload type.
 type payloadBasic struct {
 	Results [1]struct {
 		Events []map[string]interface{} `json:"events"`
@@ -23,13 +54,13 @@ type payloadBasic struct {
 	} `json:"metadata"`
 }
 
-func (p payloadBasic) Columns() []string {
+func (p payloadBasic) columns() []string {
 	return p.Metadata.Contents[0].Columns
 }
 
-func (p payloadBasic) Rows() [][]interface{} {
+func (p payloadBasic) rows() [][]interface{} {
 	var rows [][]interface{}
-	columns := p.Columns()
+	columns := p.columns()
 	for _, event := range p.Results[0].Events {
 		row := make([]interface{}, len(columns))
 		for i, column := range columns {
@@ -61,7 +92,7 @@ type payloadAggregation struct {
 	} `json:"metadata"`
 }
 
-func (p payloadAggregation) Columns() []string {
+func (p payloadAggregation) columns() []string {
 	columns := make([]string, len(p.Metadata.Contents))
 	for i, content := range p.Metadata.Contents {
 		columns[i] = content.Function
@@ -97,7 +128,7 @@ func parseRow(row []map[string]interface{}) []interface{} {
 }
 
 // This always returns one row
-func (p payloadAggregation) Rows() [][]interface{} {
+func (p payloadAggregation) rows() [][]interface{} {
 	return [][]interface{}{parseRow(p.Results)}
 }
 
@@ -134,7 +165,7 @@ type payloadFacet struct {
 	} `json:"metadata"`
 }
 
-func (p payloadFacet) Columns() []string {
+func (p payloadFacet) columns() []string {
 	columns := make([]string, len(p.Metadata.Contents.Contents)+1)
 	columns[0] = p.Metadata.Facet
 	for i, content := range p.Metadata.Contents.Contents {
@@ -147,7 +178,7 @@ func (p payloadFacet) Columns() []string {
 	return columns
 }
 
-func (p payloadFacet) Rows() [][]interface{} {
+func (p payloadFacet) rows() [][]interface{} {
 	rows := make([][]interface{}, len(p.Facets))
 	for i, facet := range p.Facets {
 		row := make([]interface{}, len(facet.Results)+1)
@@ -160,6 +191,8 @@ func (p payloadFacet) Rows() [][]interface{} {
 	return rows
 }
 
+// This function tries to guess the type of New Relic payload and decode it
+// accordingly
 func unmarshalPayload(data []byte) (payload, error) {
 	// Allocate 3 mutually exclusive payload instances; exactly one of these
 	// should match the JSON payload. This is a hack, but I can't think of a
@@ -174,6 +207,9 @@ func unmarshalPayload(data []byte) (payload, error) {
 			if basic.Metadata.Contents[0].Columns != nil {
 				return basic, nil
 			}
+			basicErr = fmt.Errorf("missing 'metadata.contents[0].columns' field")
+		} else {
+			basicErr = fmt.Errorf("missing 'results[0].events' field")
 		}
 	}
 
@@ -182,6 +218,7 @@ func unmarshalPayload(data []byte) (payload, error) {
 		if aggregation.Results != nil {
 			return aggregation, nil
 		}
+		aggregationErr = fmt.Errorf("missing 'results' field")
 	}
 
 	var facetErr error

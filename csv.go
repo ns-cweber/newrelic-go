@@ -13,7 +13,7 @@ import (
 func stringify(v interface{}) string {
 	switch x := v.(type) {
 	case nil:
-		return ""
+		return "" // nil should be represented as the empty string
 	case float32:
 		return strconv.FormatFloat(float64(x), 'f', -1, 32)
 	case float64:
@@ -25,32 +25,13 @@ func stringify(v interface{}) string {
 	}
 }
 
-func addStaticColumns(rows [][]interface{}, staticColumns []staticColumn) {
-	for _, column := range staticColumns {
-		for i, row := range rows {
-			rows[i] = append(row, column.value)
-		}
-	}
-}
-
-// `toCSV()` writes `rows` to `w` in CSV form
-func toCSV(
-	w io.Writer,
-	staticColumns []staticColumn,
-	payload payload,
-) error {
+// `toCSV()` writes `payload` to `w` in CSV form.
+func toCSV(w io.Writer, payload payload) error {
 	// Make a new CSV writer
 	wr := csv.NewWriter(w)
 
-	// Append static columns
-	headers := payload.Columns()
-	rows := payload.Rows()
-	staticHeaders := make([]string, len(staticColumns))
-	for i, column := range staticColumns {
-		staticHeaders[i] = column.name
-	}
-	headers = append(headers, staticHeaders...)
-	addStaticColumns(rows, staticColumns)
+	headers := payload.columns()
+	rows := payload.rows()
 
 	// Write the headers to the CSV writer
 	if err := wr.Write(headers); err != nil {
