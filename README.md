@@ -48,6 +48,11 @@ duration,timestamp,name
 
 ## INSTALL
 
+### DOWNLOAD
+
+Navigate to the [releases page][1] and download the binary for your platform.
+Rename it `nrql2csv` and drop it in your `$PATH`.
+
 ### FROM SOURCE
 
 1. `brew install golang` or `apt-get install golang`
@@ -59,3 +64,5 @@ duration,timestamp,name
    * `echo "export NEW_RELIC_QUERY_KEY=<query_key>" >> ~/.bash_profile`
 
 [0]: https://docs.newrelic.com/docs/insights/export-insights-data/export-api/query-insights-event-data-api#register
+
+[1]: https://github.com/ns-cweber/nrql2csv/releases
