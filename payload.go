@@ -44,18 +44,49 @@ func (p staticColumnsPayload) rows() [][]interface{} {
 
 // This represents the basic (no-aggregations, no-facets) payload type.
 type payloadBasic struct {
+	// The first time we evaluate the columns, we'll cache them here. This is
+	// necessary because "SELECT *" queries don't populate the
+	// Metadata.Contents[0].Columns field, and we have to check the first
+	// element in Results[0].Events; however, this is a map, and map accesses
+	// are random, so subsequent calls will give back the column headers in
+	// different orders. Thus, this cache allows us to evaluate the map once
+	// at most, so subsequent calls to columns() always gives the same result.
+	cols    []string
 	Results [1]struct {
 		Events []map[string]interface{} `json:"events"`
 	} `json:"results"`
 	Metadata struct {
 		Contents [1]struct {
+			// This will not be populated if the query was "SELECT * ..."
 			Columns []string `json:"columns"`
 		} `json:"contents"`
 	} `json:"metadata"`
 }
 
-func (p payloadBasic) columns() []string {
-	return p.Metadata.Contents[0].Columns
+func (p *payloadBasic) columns() []string {
+	// This is fixed
+	if p.cols != nil {
+		return p.cols
+	}
+
+	// This is nil for "SELECT * ..." queries
+	if p.cols = p.Metadata.Contents[0].Columns; p.cols != nil {
+		return p.cols
+	}
+
+	// If this is nil, we should look to the first row for our columns. If
+	// there are no rows, we're up a creek...
+	if len(p.Results[0].Events) < 0 {
+		return nil
+	}
+
+	// The returned rows will not be in any particular order because map
+	// accesses (in most versions of the Go compiler) are random.
+	p.cols = make([]string, 0, len(p.Results[0].Events[0]))
+	for column := range p.Results[0].Events[0] {
+		p.cols = append(p.cols, column)
+	}
+	return p.cols
 }
 
 func (p payloadBasic) rows() [][]interface{} {
@@ -204,13 +235,9 @@ func unmarshalPayload(data []byte) (payload, error) {
 	var basicErr error
 	if basicErr = json.Unmarshal(data, &basic); basicErr == nil {
 		if basic.Results[0].Events != nil {
-			if basic.Metadata.Contents[0].Columns != nil {
-				return basic, nil
-			}
-			basicErr = fmt.Errorf("missing 'metadata.contents[0].columns' field")
-		} else {
-			basicErr = fmt.Errorf("missing 'results[0].events' field")
+			return &basic, nil
 		}
+		basicErr = fmt.Errorf("missing 'results[0].events' field")
 	}
 
 	var aggregationErr error
