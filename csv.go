@@ -25,35 +25,26 @@ func stringify(v interface{}) string {
 	}
 }
 
-func addStaticColumns(rows []row, staticColumns []staticColumn) {
+func addStaticColumns(rows [][]interface{}, staticColumns []staticColumn) {
 	for _, column := range staticColumns {
-		for _, row := range rows {
-			row[column.name] = column.value
+		for i, row := range rows {
+			rows[i] = append(row, column.value)
 		}
 	}
 }
 
 // `toCSV()` writes `rows` to `w` in CSV form
-func toCSV(w io.Writer, headers []string, staticColumns []staticColumn, rows []row) error {
-	// Bail if no rows were received
-	if len(rows) < 1 {
-		return nil
-	}
-
+func toCSV(
+	w io.Writer,
+	staticColumns []staticColumn,
+	payload payload,
+) error {
 	// Make a new CSV writer
 	wr := csv.NewWriter(w)
 
-	// If headers are nil, collect the headers from the first row; this order
-	// will be pseudo-random, but we'll use this order for all the rows going
-	// forward
-	if headers == nil {
-		headers = make([]string, 0, len(rows[0]))
-		for header := range rows[0] {
-			headers = append(headers, header)
-		}
-	}
-
 	// Append static columns
+	headers := payload.Columns()
+	rows := payload.Rows()
 	staticHeaders := make([]string, len(staticColumns))
 	for i, column := range staticColumns {
 		staticHeaders[i] = column.name
@@ -73,7 +64,7 @@ func toCSV(w io.Writer, headers []string, staticColumns []staticColumn, rows []r
 	// the headers. Write the row to the CSV writer.
 	for _, row := range rows {
 		for i := range headers {
-			buffer[i] = stringify(row[headers[i]])
+			buffer[i] = stringify(row[i])
 		}
 		if err := wr.Write(buffer); err != nil {
 			return err

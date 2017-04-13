@@ -20,6 +20,7 @@ func parseFlags() (query, []staticColumn) {
 	var q query
 	var columns string
 	var static string
+	var dry bool
 	flag.StringVar(
 		&columns,
 		"select",
@@ -38,6 +39,7 @@ func parseFlags() (query, []staticColumn) {
 		"[OPTIONAL] extra fixed-value columns (e.g., 'col1=val1,col2=val2')",
 	)
 	flag.IntVar(&q.limit, "limit", -1, "[OPTIONAL] the LIMIT column")
+	flag.BoolVar(&dry, "dry", false, "[OPTIONAL] Prints the query")
 	flag.Parse()
 
 	if columns != "*" && columns != "" {
@@ -74,6 +76,11 @@ func parseFlags() (query, []staticColumn) {
 		}
 	}
 
+	if dry {
+		fmt.Println(q.String())
+		os.Exit(0)
+	}
+
 	return q, staticColumns
 }
 
@@ -107,13 +114,13 @@ func main() {
 	}
 
 	// Execute the query
-	rows, err := q.exec(accountID, queryKey)
+	payload, err := q.exec(accountID, queryKey)
 	if err != nil {
 		abortf("Error for query '%s': %v", q, err)
 	}
 
 	// Format the query
-	if err := toCSV(os.Stdout, q.columns, staticColumns, rows); err != nil {
+	if err := toCSV(os.Stdout, staticColumns, payload); err != nil {
 		abort(err)
 	}
 }
