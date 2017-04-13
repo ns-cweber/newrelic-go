@@ -4,7 +4,7 @@ README
 NOTE: This is alpha software
 
 Executes a NRQL query and returns the result in CSV form. You will need
-NEW_RELIC_ACCOUNT_ID and NEW_RELIC_QUERY_KEY environment variables (for
+`NEW_RELIC_ACCOUNT_ID` and `NEW_RELIC_QUERY_KEY` environment variables (for
 information about how to get your query key, [see here][0]).
 
 ## USAGE
