@@ -6,18 +6,16 @@ import (
 	"os"
 	"strings"
 	"unicode"
+
+	nrql "github.com/ns-cweber/nrql2csv"
 )
 
 func trim(s string) string {
 	return strings.TrimFunc(s, unicode.IsSpace)
 }
 
-type staticColumn struct {
-	name, value string
-}
-
-func parseFlags() (query, []staticColumn) {
-	var q query
+func parseFlags() (nrql.Query, []nrql.StaticColumn) {
+	var q nrql.Query
 	var columns string
 	var static string
 	var dry bool
@@ -27,44 +25,44 @@ func parseFlags() (query, []staticColumn) {
 		"",
 		"[OPTIONAL] the comma-delineated column names to query for",
 	)
-	flag.StringVar(&q.table, "from", "", "[REQUIRED] the table to query from")
-	flag.StringVar(&q.where, "where", "", "[OPTIONAL] the WHERE clause")
-	flag.StringVar(&q.since, "since", "", "[OPTIONAL] the SINCE clause")
-	flag.StringVar(&q.until, "until", "", "[OPTIONAL] the UNTIL clause")
-	flag.StringVar(&q.facet, "facet", "", "[OPTIONAL] the FACET column")
+	flag.StringVar(&q.Table, "from", "", "[REQUIRED] the table to query from")
+	flag.StringVar(&q.Where, "where", "", "[OPTIONAL] the WHERE clause")
+	flag.StringVar(&q.Since, "since", "", "[OPTIONAL] the SINCE clause")
+	flag.StringVar(&q.Until, "until", "", "[OPTIONAL] the UNTIL clause")
+	flag.StringVar(&q.Facet, "facet", "", "[OPTIONAL] the FACET column")
 	flag.StringVar(
 		&static,
 		"static",
 		"",
 		"[OPTIONAL] extra fixed-value columns (e.g., 'col1=val1,col2=val2')",
 	)
-	flag.IntVar(&q.limit, "limit", -1, "[OPTIONAL] the LIMIT column")
+	flag.IntVar(&q.Limit, "limit", -1, "[OPTIONAL] the LIMIT column")
 	flag.BoolVar(&dry, "dry", false, "[OPTIONAL] Prints the query")
 	flag.Parse()
 
 	if columns != "*" && columns != "" {
 		for _, col := range strings.Split(columns, ",") {
-			q.columns = append(q.columns, trim(col))
+			q.Columns = append(q.Columns, trim(col))
 		}
 	}
 
-	if q.table == "" {
+	if q.Table == "" {
 		fmt.Fprintln(os.Stderr, "Missing --from flag")
 		flag.Usage()
 		os.Exit(-1)
 	}
 
-	var staticColumns []staticColumn
+	var staticColumns []nrql.StaticColumn
 	if static != "" {
 		for _, column := range strings.Split(static, ",") {
 			if idx := strings.IndexRune(column, '='); idx >= 0 {
-				sc := staticColumn{
-					name:  trim(column[:idx]),
-					value: trim(column[idx+1:]),
+				sc := nrql.StaticColumn{
+					Name:  trim(column[:idx]),
+					Value: trim(column[idx+1:]),
 				}
 
 				// it's ok to have an empty value, but not an empty name
-				if sc.name != "" {
+				if sc.Name != "" {
 					staticColumns = append(staticColumns, sc)
 					continue
 				}
@@ -112,16 +110,16 @@ func main() {
 	}
 
 	// Execute the query
-	payload, err := q.exec(accountID, queryKey)
+	payload, err := nrql.Client{AccountID: accountID, QueryKey: queryKey}.Exec(q)
 	if err != nil {
 		abortf("Error for query '%s': %v", q, err)
 	}
 
 	// Add the static columns
-	payload = staticColumnsPayload{payload, staticColumns}
+	payload = nrql.StaticColumnsPayload{payload, staticColumns}
 
 	// Format the query
-	if err := toCSV(os.Stdout, payload); err != nil {
+	if err := nrql.FormatCSV(os.Stdout, payload); err != nil {
 		abort(err)
 	}
 }

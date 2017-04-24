@@ -1,4 +1,4 @@
-package main
+package nrql
 
 import (
 	"encoding/csv"
@@ -25,13 +25,13 @@ func stringify(v interface{}) string {
 	}
 }
 
-// `toCSV()` writes `payload` to `w` in CSV form.
-func toCSV(w io.Writer, payload payload) error {
+// `FormatCSV()` writes `payload` to `w` in CSV form.
+func FormatCSV(w io.Writer, payload Payload) error {
 	// Make a new CSV writer
 	wr := csv.NewWriter(w)
 
-	headers := payload.columns()
-	rows := payload.rows()
+	headers := payload.Columns()
+	rows := payload.Rows()
 
 	// Write the headers to the CSV writer
 	if err := wr.Write(headers); err != nil {

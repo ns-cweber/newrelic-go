@@ -1,4 +1,4 @@
-package main
+package nrql
 
 import (
 	"bytes"
@@ -9,48 +9,52 @@ import (
 
 // This is an abstraction over all of the varieties of payloads the New Relic
 // API might send down.
-type payload interface {
-	columns() []string
-	rows() [][]interface{}
+type Payload interface {
+	Columns() []string
+	Rows() [][]interface{}
+}
+
+type StaticColumn struct {
+	Name, Value string
 }
 
 // This type wraps an existing payload and suffixes it with fixed data from
 // static columns. Given a table with columns {a, b, c} and static columns
 // {d, e} with values {4, 5} respectively, the resultant columns will be {a, b,
 // c, d, e} and the last two columns will be entirely 4s and 5s respectively.
-type staticColumnsPayload struct {
-	payload
-	staticColumns []staticColumn
+type StaticColumnsPayload struct {
+	Payload
+	StaticColumns []StaticColumn
 }
 
-func (p staticColumnsPayload) columns() []string {
-	columns := p.payload.columns()
-	staticColumnHeaders := make([]string, len(p.staticColumns))
-	for i, column := range p.staticColumns {
-		staticColumnHeaders[i] = column.name
+func (p StaticColumnsPayload) columns() []string {
+	columns := p.Payload.Columns()
+	staticColumnHeaders := make([]string, len(p.StaticColumns))
+	for i, column := range p.StaticColumns {
+		staticColumnHeaders[i] = column.Name
 	}
 	return append(columns, staticColumnHeaders...)
 }
 
-func (p staticColumnsPayload) rows() [][]interface{} {
-	rows := p.payload.rows()
-	for _, column := range p.staticColumns {
+func (p StaticColumnsPayload) Rows() [][]interface{} {
+	rows := p.Payload.Rows()
+	for _, column := range p.StaticColumns {
 		for i, row := range rows {
-			rows[i] = append(row, column.value)
+			rows[i] = append(row, column.Value)
 		}
 	}
 	return rows
 }
 
 // This represents the basic (no-aggregations, no-facets) payload type.
-type payloadBasic struct {
+type PayloadBasic struct {
 	// The first time we evaluate the columns, we'll cache them here. This is
 	// necessary because "SELECT *" queries don't populate the
 	// Metadata.Contents[0].Columns field, and we have to check the first
 	// element in Results[0].Events; however, this is a map, and map accesses
 	// are random, so subsequent calls will give back the column headers in
 	// different orders. Thus, this cache allows us to evaluate the map once
-	// at most, so subsequent calls to columns() always gives the same result.
+	// at most, so subsequent calls to Columns() always gives the same result.
 	cols    []string
 	Results [1]struct {
 		Events []map[string]interface{} `json:"events"`
@@ -63,7 +67,7 @@ type payloadBasic struct {
 	} `json:"metadata"`
 }
 
-func (p *payloadBasic) columns() []string {
+func (p *PayloadBasic) Columns() []string {
 	// This is fixed
 	if p.cols != nil {
 		return p.cols
@@ -89,9 +93,9 @@ func (p *payloadBasic) columns() []string {
 	return p.cols
 }
 
-func (p payloadBasic) rows() [][]interface{} {
+func (p PayloadBasic) Rows() [][]interface{} {
 	var rows [][]interface{}
-	columns := p.columns()
+	columns := p.Columns()
 	for _, event := range p.Results[0].Events {
 		row := make([]interface{}, len(columns))
 		for i, column := range columns {
@@ -102,7 +106,7 @@ func (p payloadBasic) rows() [][]interface{} {
 	return rows
 }
 
-type payloadAggregation struct {
+type PayloadAggregation struct {
 	Results  []map[string]interface{} `json:"results"`
 	Metadata struct {
 		Contents []struct {
@@ -123,7 +127,7 @@ type payloadAggregation struct {
 	} `json:"metadata"`
 }
 
-func (p payloadAggregation) columns() []string {
+func (p PayloadAggregation) Columns() []string {
 	columns := make([]string, len(p.Metadata.Contents))
 	for i, content := range p.Metadata.Contents {
 		columns[i] = content.Function
@@ -159,11 +163,11 @@ func parseRow(row []map[string]interface{}) []interface{} {
 }
 
 // This always returns one row
-func (p payloadAggregation) rows() [][]interface{} {
+func (p PayloadAggregation) Rows() [][]interface{} {
 	return [][]interface{}{parseRow(p.Results)}
 }
 
-type payloadFacet struct {
+type PayloadFacet struct {
 	Facets []struct {
 		Name    string                   `json:"name"`
 		Results []map[string]interface{} `json:"results"`
@@ -196,7 +200,7 @@ type payloadFacet struct {
 	} `json:"metadata"`
 }
 
-func (p payloadFacet) columns() []string {
+func (p PayloadFacet) Columns() []string {
 	columns := make([]string, len(p.Metadata.Contents.Contents)+1)
 	columns[0] = p.Metadata.Facet
 	for i, content := range p.Metadata.Contents.Contents {
@@ -209,7 +213,7 @@ func (p payloadFacet) columns() []string {
 	return columns
 }
 
-func (p payloadFacet) rows() [][]interface{} {
+func (p PayloadFacet) Rows() [][]interface{} {
 	rows := make([][]interface{}, len(p.Facets))
 	for i, facet := range p.Facets {
 		row := make([]interface{}, len(facet.Results)+1)
@@ -224,13 +228,13 @@ func (p payloadFacet) rows() [][]interface{} {
 
 // This function tries to guess the type of New Relic payload and decode it
 // accordingly
-func unmarshalPayload(data []byte) (payload, error) {
+func unmarshalPayload(data []byte) (Payload, error) {
 	// Allocate 3 mutually exclusive payload instances; exactly one of these
 	// should match the JSON payload. This is a hack, but I can't think of a
 	// better way to cope with NewRelic's wonky API.
-	var basic payloadBasic
-	var aggregation payloadAggregation
-	var facet payloadFacet
+	var basic PayloadBasic
+	var aggregation PayloadAggregation
+	var facet PayloadFacet
 
 	var basicErr error
 	if basicErr = json.Unmarshal(data, &basic); basicErr == nil {
