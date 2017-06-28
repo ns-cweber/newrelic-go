@@ -27,7 +27,7 @@ type StaticColumnsPayload struct {
 	StaticColumns []StaticColumn
 }
 
-func (p StaticColumnsPayload) columns() []string {
+func (p StaticColumnsPayload) Columns() []string {
 	columns := p.Payload.Columns()
 	staticColumnHeaders := make([]string, len(p.StaticColumns))
 	for i, column := range p.StaticColumns {
@@ -206,7 +206,6 @@ func (p PayloadFacet) Columns() []string {
 	for i, content := range p.Metadata.Contents.Contents {
 		columns[i+1] = content.Function
 		if content.Function == "alias" {
-			println("ALIAS:", content.Alias)
 			columns[i+1] = content.Alias
 		}
 	}

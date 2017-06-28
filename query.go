@@ -39,12 +39,12 @@ func (q Query) String() string {
 
 	var since string
 	if q.Since != "" {
-		since = " SINCE " + q.Since
+		since = " SINCE '" + q.Since + "'"
 	}
 
 	var until string
 	if q.Until != "" {
-		until = " UNTIL " + q.Until
+		until = " UNTIL '" + q.Until + "'"
 	}
 
 	return "SELECT " + columns + " FROM " + q.Table + where + since + until +
